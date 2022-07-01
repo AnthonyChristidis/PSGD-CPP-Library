@@ -89,9 +89,9 @@ void PS_Model::Adjust_Design() {
 
 	// Setting the step size for GD
 	if (model_type == 1)
-		step_size = 2 / std::pow(arma::max(arma::eig_sym(x_subset.t() * x_subset)), 2);
+		step_size = 2 / arma::max(arma::eig_sym(x_subset.t() * x_subset));
 	else if (model_type == 2)
-		step_size = 4 / std::pow(arma::max(arma::eig_sym(x_subset.t() * x_subset)), 2);
+		step_size = 4 / arma::max(arma::eig_sym(x_subset.t() * x_subset));
 
 	// Setting the size of the GD vectors
 	betas.set_size(x_subset.n_cols); betas.zeros();

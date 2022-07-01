@@ -51,6 +51,9 @@ void Step_Model::UpdateRes(const arma::vec& y) {
 
 // Update the stoping criterion
 void Step_Model::UpdateCriteria(const arma::vec& y) {
+    
+    F_val = optimal_rss_decrease / ((current_rss - optimal_rss_decrease) / (y.n_elem - (variables_counter + 1)));
+    p_val = R::pf(F_val, 1, y.n_elem - (variables_counter + 1), 0, 1);
 
     switch (stop_criterion) {
 
@@ -59,9 +62,6 @@ void Step_Model::UpdateCriteria(const arma::vec& y) {
     case 2: aR2 = 1 - ((current_rss - optimal_rss_decrease) / (y.n_elem - (variables_counter + 1))) / (accu(pow(y, 2)) / y.n_elem - 1);
         break;
     case 3: pR2 = optimal_rss_decrease / (current_rss);
-        break;
-    case 4: F_val = optimal_rss_decrease / ((current_rss - optimal_rss_decrease) / (y.n_elem - (variables_counter + 1)));
-        p_val = R::pf(F_val, 1, y.n_elem - (variables_counter + 1), 0, 1);
         break;
     }
 }

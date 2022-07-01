@@ -25,9 +25,9 @@ Rcpp::List Main_CV_PSGD(const arma::mat& x, const arma::vec& y, arma::uword& n_m
                         arma::uword cycling_iter,
                         arma::uword n_folds,
                         arma::uword n_threads) {
-  
+   
   // Variable to store the grid ensemble loss
-  arma::mat prediction_loss = arma::zeros(size_grid.n_elem, split_grid.n_elem);
+  arma::cube prediction_loss_folds = arma::zeros(size_grid.n_elem, split_grid.n_elem, n_folds);
   
   // Storing the number of variables and observations
   const arma::uword n = x.n_rows;
@@ -35,40 +35,42 @@ Rcpp::List Main_CV_PSGD(const arma::mat& x, const arma::vec& y, arma::uword& n_m
   const arma::uvec indin = arma::linspace<arma::uvec>(0, n - 1, n);
   const arma::uvec inint = arma::linspace<arma::uvec>(0, n, n_folds + 1);
   
-  // Looping over the model splits
-  for (arma::uword split_ind = 0; split_ind < split_grid.n_elem; split_ind++) {
+  // Looping over the folds (with parallelization)
+  # pragma omp parallel for num_threads(n_threads)
+  for (arma::uword fold = 0; fold < n_folds; fold++){
     
-    // Looping over the folds (with parallelization)
-    // # pragma omp parallel for num_threads(n_threads)
-    for (arma::uword fold = 0; fold < n_folds; fold++) {
+    // Looping over the model splits
+    for (arma::uword size_ind = 0; size_ind < size_grid.n_elem; size_ind++) {
       
       // Get test and training samples
       arma::uvec test = arma::linspace<arma::uvec>(inint[fold], inint[fold + 1] - 1, inint[fold + 1] - inint[fold]);
       arma::uvec train = Set_Diff(indin, test);
-      arma::uword size_fold = ((size_grid[0] < train.n_elem) ? size_grid[0] : train.n_elem);
+      arma::uword size_fold = ((size_grid[size_ind] < train.n_elem) ? size_grid[size_ind] : train.n_elem);
       
       // Ensemble PSGD model (initialization with no sharing)
       PSGD ensemble_model = PSGD(x.rows(train), y.elem(train), n_models,
                                  model_type, include_intercept,
-                                 split_grid[split_ind], size_fold,
+                                 1, size_fold,
                                  max_iter,
                                  cycling_iter);
       ensemble_model.Ensemble_Initialization();
       ensemble_model.Compute_Ensemble_Cycling();
-      prediction_loss(0, split_ind) += ensemble_model.Prediction_Loss(x.rows(test), y.elem(test));
+      prediction_loss_folds(size_ind, 0, fold) += ensemble_model.Prediction_Loss(x.rows(test), y.elem(test));
       
       // Looping over the model sizes
-      for (arma::uword size_ind = 1; size_ind < size_grid.n_elem; size_ind++) {
+      for (arma::uword split_ind = 1; split_ind < split_grid.n_elem; split_ind++) {
         
-        size_fold = ((size_grid[size_ind] < train.n_elem) ? size_grid[size_ind] : train.n_elem);
-        ensemble_model.Set_Size(size_fold);
+        ensemble_model.Set_Split(split_grid[split_ind]);
         ensemble_model.Compute_Ensemble_Cycling();
-        prediction_loss(size_ind, split_ind) += ensemble_model.Prediction_Loss(x.rows(test), y.elem(test));
+        prediction_loss_folds(size_ind, split_ind, fold) += ensemble_model.Prediction_Loss(x.rows(test), y.elem(test));
       }
     }
   }
   
   // Adjusting prediction loss
+  arma::mat prediction_loss = arma::zeros(size_grid.n_elem, split_grid.n_elem);
+  for(arma::uword fold = 0; fold < n_folds; fold++)
+    prediction_loss += prediction_loss_folds.slice(fold);
   prediction_loss /= n_folds;
 
   // Optimal split and size

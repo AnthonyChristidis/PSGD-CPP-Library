@@ -94,7 +94,7 @@ Rcpp::List Stepwise_Split(arma::mat x,
                 if (!(models[m]->Get_Full()))
                     models_p_val(m) = models[m]->Get_p_val();
                 else
-                    models_p_val(m) = -1;
+                    models_p_val(m) = 1;
             }
             // Optimal model 
             optimal_model = models_p_val.index_min();

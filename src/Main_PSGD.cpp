@@ -30,7 +30,7 @@ Rcpp::List Main_PSGD(const arma::mat& x, const arma::vec& y, arma::uword& n_mode
                              max_iter,
                              cycling_iter);
   ensemble_model.Ensemble_Initialization();
-  ensemble_model.Compute_Ensemble_Cycling();
+  ensemble_model.Compute_Ensemble();
   
   // Increasing until split parameter is achieved
   for(arma::uword split_param = 2; split_param <= split; split_param++){

@@ -25,9 +25,20 @@ void PSGD::Update_Subset_Matrix(arma::uword& group) {
   group_subset(arma::find(betas.col(group) != 0)).ones();
   subset_indices.col(group) = group_subset;
 }
+void PSGD::Update_Subset_Matrix(arma::uword& group, arma::mat& subset_indices, arma::mat& betas) {
+  
+  arma::colvec group_subset = arma::zeros(x.n_cols);
+  group_subset(arma::find(betas.col(group) != 0)).ones();
+  subset_indices.col(group) = group_subset;
+}
 
 // Function to check subset of model
 arma::uvec PSGD::Model_Subset(arma::uword& group) {
+  
+  arma::vec predictor_usage = arma::sum(subset_indices, 1) - subset_indices.col(group);
+  return(arma::find(predictor_usage < split));
+}
+arma::uvec PSGD::Model_Subset(arma::uword& group, arma::mat& subset_indices) {
   
   arma::vec predictor_usage = arma::sum(subset_indices, 1) - subset_indices.col(group);
   return(arma::find(predictor_usage < split));
@@ -89,7 +100,7 @@ void PSGD::Ensemble_Initialization() {
     arma::uvec step_model_indices = variables_list[group];
     arma::vec group_indices = arma::zeros(x.n_cols);
     group_indices(step_model_indices).ones();
-    subset_indices.col(group) = group_indices;
+    subset_indices.col(group) = group_indices; 
   }
 }
 
@@ -117,49 +128,66 @@ void PSGD::Compute_Ensemble() {
 // Function to compute the ensemble model via cycling
 void PSGD::Compute_Ensemble_Cycling() {
   
+  // Current model subsets
+  arma::mat subset_indices_initial = subset_indices;
+  
   // Compute initial ensemble fit
   Compute_Ensemble();
   
-  // Variables to store ensemble loss
-  arma::vec ensemble_loss_candidate = arma::zeros(n_models);
-  
-  // Cycling iterations
-  for (arma::uword cycling_count = 0; cycling_count < cycling_iter; cycling_count++) {
+  // COnditional on at least one cycling iteration
+  if(cycling_iter>0){
     
-    // Order of updates
-    Rcpp::IntegerVector group_order = Rcpp::sample(n_models, n_models, false)-1;
-    arma::uword group_id;
+    // Variables for cycling algorithm
+    arma::vec ensemble_loss_candidate = arma::zeros(n_models);
+    arma::mat subset_indices_candidate = arma::zeros(x.n_cols, n_models);
+    arma::mat betas_candidate = arma::zeros(x.n_cols, n_models);
+    arma::vec intercepts_candidate = arma::zeros(n_models);
     
-    // Create the memory for the models 
-    std::vector<PS_Model*> models; 
-    // Initialize the models through the constructors
-    for (arma::uword group = 0; group < n_models; group++)
-    {
-      arma::uvec model_subset = Model_Subset(group);
-      models.push_back(new PS_Model(x, y, model_type, include_intercept, model_subset, size, max_iter));
-    }
-    
-    // Cycle groups
-    for (arma::uword group = 0; group < n_models; group++)
-    {
-      group_id = group_order[group];
-      // Computing the coefficients
-      models[group_id]->Set_Subset(Model_Subset(group_id));
-      models[group_id]->Compute_PS();
-      ensemble_loss_candidate(group_id) = models[group_id]->Get_Final_Loss();
-    }
-
-    // Updating the groups
-    if (arma::as_scalar(arma::mean(ensemble_loss_candidate)) < arma::as_scalar(arma::mean(ensemble_loss))) {
+    // Cycling iterations
+    for (arma::uword cycling_count = 0; cycling_count < cycling_iter; cycling_count++) {
+      
+      // Order of updates
+      Rcpp::IntegerVector group_order = Rcpp::sample(n_models, n_models, false)-1;
+      arma::uword group_id;
+      
+      // Create the memory for the models 
+      std::vector<PS_Model*> models; 
+      // Initialize the models through the constructors
       for (arma::uword group = 0; group < n_models; group++) {
         
-        intercepts(group) = arma::as_scalar(models[group]->Get_Final_Intercept());
-        betas.col(group) = models[group]->Get_Final_Betas();
-        Update_Subset_Matrix(group);
+        arma::uvec model_subset = Model_Subset(group, subset_indices_initial);
+        models.push_back(new PS_Model(x, y, model_type, include_intercept, model_subset, size, max_iter));
       }
-      ensemble_loss = ensemble_loss_candidate;
+      
+      // Initial subsets for the models
+      subset_indices_candidate = subset_indices_initial;
+      
+      // Cycle groups
+      for (arma::uword group = 0; group < n_models; group++) {
+        
+        group_id = group_order[group];
+        // Computing the coefficients
+        models[group_id]->Set_Subset(Model_Subset(group_id, subset_indices_candidate));
+        models[group_id]->Compute_PS();
+        intercepts_candidate(group_id) = arma::as_scalar(models[group_id]->Get_Final_Intercept());
+        betas_candidate.col(group_id) = models[group_id]->Get_Final_Betas();
+        ensemble_loss_candidate(group_id) = models[group_id]->Get_Final_Loss();
+        Update_Subset_Matrix(group_id, subset_indices_candidate, betas_candidate);
+      }
+      
+      // std::cout << "ensemble_loss: " << arma::mean(ensemble_loss) << std::endl;
+      // std::cout << "ensemble_loss_candidate: " << arma::mean(ensemble_loss_candidate) << std::endl << std::endl;
+      
+      // Updating the groups
+      if (arma::as_scalar(arma::mean(ensemble_loss_candidate)) < arma::as_scalar(arma::mean(ensemble_loss))) {
+        
+        intercepts = intercepts_candidate;
+        betas = betas_candidate;
+        subset_indices = subset_indices_candidate;
+        ensemble_loss = ensemble_loss_candidate;
+      }
     }
-  }
+  } // End of cycling iterations
 }
 
 // Function to return final intercept and betas

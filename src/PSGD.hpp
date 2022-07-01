@@ -43,9 +43,11 @@ private:
   
   // Function to update subset of a model
   void Update_Subset_Matrix(arma::uword& group);
+  void Update_Subset_Matrix(arma::uword& group, arma::mat& subset_indices, arma::mat& betas);
   
   // Function to check subset of model
   arma::uvec Model_Subset(arma::uword& group);
+  arma::uvec Model_Subset(arma::uword& group, arma::mat& subset_indices);
   
 public:
   
