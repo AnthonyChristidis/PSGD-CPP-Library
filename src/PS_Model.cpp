@@ -5,7 +5,7 @@
 * Package Name: PSGD
 *
 * Created by Anthony-A. Christidis.
-* Copyright © Anthony-A. Christidis. All rights reserved.
+* Copyright (c) Anthony-A. Christidis. All rights reserved.
 * ===========================================================
 */
 
