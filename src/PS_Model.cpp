@@ -45,7 +45,7 @@ PS_Model::PS_Model(const arma::mat& x, const arma::vec& y,
 // Function to project vector
 void PS_Model::Project() {
 
-	arma::uvec ranks = arma::sort_index(new_betas, "descend");
+	arma::uvec ranks = arma::sort_index(arma::abs(new_betas), "descend");
 	ranks = arma::linspace<arma::uvec>(0, new_betas.n_elem - 1, new_betas.n_elem)(ranks);
 	arma::uvec disabled_ranks = ranks(arma::linspace<arma::uvec>(size, new_betas.n_elem - 1, new_betas.n_elem - size));
 	new_betas(disabled_ranks).zeros();

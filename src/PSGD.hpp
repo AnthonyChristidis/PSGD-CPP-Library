@@ -1,4 +1,4 @@
-#/*
+/*
 * ===========================================================
 * File Type: HPP
 * File Name: PSGD.hpp
@@ -42,7 +42,7 @@ private:
   arma::vec ensemble_loss;
   
   // Function to update subset of a model
-  void Update_Subset_Matrix(arma::uword& group);
+  void Update_Subset_Matrix(arma::uword& group); 
   void Update_Subset_Matrix(arma::uword& group, arma::mat& subset_indices, arma::mat& betas);
   
   // Function to check subset of model

@@ -1,4 +1,4 @@
-#/*
+/*
 * ===========================================================
 * File Type: CPP
 * File Name: PSGD.cpp
@@ -9,7 +9,7 @@
 * ===========================================================
 */
 
-// Libraries included 
+// Libraries included  
 #include <RcppArmadillo.h>
 #include <iostream>
 
@@ -26,7 +26,7 @@ void PSGD::Update_Subset_Matrix(arma::uword& group) {
   subset_indices.col(group) = group_subset;
 }
 void PSGD::Update_Subset_Matrix(arma::uword& group, arma::mat& subset_indices, arma::mat& betas) {
-  
+
   arma::colvec group_subset = arma::zeros(x.n_cols); 
   group_subset(arma::find(betas.col(group) != 0)).ones();
   subset_indices.col(group) = group_subset;
@@ -112,8 +112,7 @@ void PSGD::Compute_Ensemble() {
   // Initialize the models through the constructors
   for (arma::uword group = 0; group < n_models; group++)
   {
-    arma::uvec model_subset = Model_Subset(group);
-    models.push_back(new PS_Model(x, y, model_type, include_intercept, model_subset, size, max_iter));
+    models.push_back(new PS_Model(x, y, model_type, include_intercept, Model_Subset(group), size, max_iter));
     
     // Computing the coefficients
     models[group]->Set_Subset(Model_Subset(group));
@@ -123,6 +122,10 @@ void PSGD::Compute_Ensemble() {
     ensemble_loss(group) = models[group]->Get_Final_Loss();
     Update_Subset_Matrix(group);
   }
+  
+  // Deleting the models
+  for (arma::uword group = 0; group < n_models; group++)
+    delete(models[group]);
 }
 
 // Function to compute the ensemble model via cycling
@@ -155,8 +158,7 @@ void PSGD::Compute_Ensemble_Cycling() {
       // Initialize the models through the constructors
       for (arma::uword group = 0; group < n_models; group++) {
         
-        arma::uvec model_subset = Model_Subset(group, subset_indices_initial);
-        models.push_back(new PS_Model(x, y, model_type, include_intercept, model_subset, size, max_iter));
+        models.push_back(new PS_Model(x, y, model_type, include_intercept, Model_Subset(group, subset_indices_initial), size, max_iter));
       }
       
       // Initial subsets for the models
@@ -186,6 +188,10 @@ void PSGD::Compute_Ensemble_Cycling() {
         subset_indices = subset_indices_candidate;
         ensemble_loss = ensemble_loss_candidate;
       }
+      
+      // Deleting the models
+      for (arma::uword group = 0; group < n_models; group++)
+        delete(models[group]);
     }
   } // End of cycling iterations
 }
